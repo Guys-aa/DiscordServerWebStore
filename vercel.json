@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "prim-store",
+  "builds": [
+    {
+      "src": "api/*.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "env": {
+    "VERCEL_URL": "https://prim-store.vercel.app"
+  },
+  "functions": {
+    "api/*.py": {
+      "runtime": "python3.9"
+    }
+  }
+}
