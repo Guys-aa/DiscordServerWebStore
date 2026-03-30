@@ -3,7 +3,7 @@
   "name": "prim-store",
   "builds": [
     {
-      "src": "api/*.py",
+      "src": "api.py",
       "use": "@vercel/python"
     },
     {
@@ -13,8 +13,16 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "src": "/api/auth/validate",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/api/health",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/api/user/info",
+      "dest": "/api.py"
     },
     {
       "src": "/(.*)",
@@ -25,7 +33,7 @@
     "VERCEL_URL": "https://prim-store.vercel.app"
   },
   "functions": {
-    "api/*.py": {
+    "api.py": {
       "runtime": "python3.9"
     }
   }
