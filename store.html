@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRIM Store - デジタル商品ストア</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%);
+            min-height: 100vh;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80') center/cover;
+            opacity: 0.1;
+            z-index: -1;
+        }
+        
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .sidebar {
+            background: rgba(30, 60, 114, 0.8);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .nav-link {
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #4f46e5;
+            transform: scaleX(0);
+            transition: transform 0.2s ease;
+        }
+        
+        .nav-link:hover::after {
+            transform: scaleX(1);
+        }
+        
+        .category-pill {
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .category-pill:hover, .category-pill.active {
+            background: rgba(79, 70, 229, 0.8);
+            border-color: #4f46e5;
+            transform: scale(1.05);
+        }
+        
+        .loading-shimmer {
+            background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            transition: all 0.3s ease;
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 通知 -->
+    <div id="notification" class="notification hidden">
+        <div class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-3">
+            <i class="fas fa-check-circle"></i>
+            <span id="notification-text">商品がカートに追加されました</span>
+        </div>
+    </div>
+
+    <!-- ヘッダー -->
+    <header class="glass-morphism text-white shadow-lg sticky top-0 z-50 border-b border-white/10">
+        <nav class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-8">
+                    <div class="text-2xl font-bold flex items-center space-x-2">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold">P</span>
+                        </div>
+                        <span>PRIM Store</span>
+                    </div>
+                    <div class="hidden md:flex items-center space-x-6">
+                        <a href="#home" class="nav-link hover:text-blue-300 transition">Home</a>
+                        <a href="#products" class="nav-link hover:text-blue-300 transition">Store</a>
+                        <a href="#categories" class="nav-link hover:text-blue-300 transition">Categories</a>
+                        <a href="#about" class="nav-link hover:text-blue-300 transition">About</a>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div id="user-display" class="hidden md:flex items-center space-x-3">
+                        <div class="user-avatar" id="user-avatar">
+                            <i class="fas fa-user text-sm"></i>
+                        </div>
+                        <span id="user-name" class="text-sm">Guest</span>
+                    </div>
+                    <button onclick="openCart()" class="relative p-2 hover:bg-white/10 rounded-lg transition">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span id="cart-count" class="absolute -top-1 -right-1 bg-red-500 text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                    </button>
+                    <button class="md:hidden p-2 hover:bg-white/10 rounded-lg">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- ヒーローセクション -->
+    <section id="home" class="py-20 text-white">
+        <div class="container mx-auto px-6">
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- メインコンテンツ -->
+                <div class="md:col-span-2">
+                    <div class="mb-6">
+                        <div class="text-sm text-gray-300 mb-2">Home > Store</div>
+                        <h1 class="text-4xl md:text-5xl font-bold mb-4">WELCOME TO THE OFFICIAL PRIM STORE</h1>
+                        <p class="text-xl text-gray-300 mb-8">高品質なデジタルコンテンツを、簡単・安全・迅速に</p>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <button onclick="scrollToProducts()" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+                                Browse Products
+                            </button>
+                            <button onclick="showNotification('Discordで購入してください！')" class="border-2 border-blue-400 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-400 hover:text-blue-900 transition">
+                                Discordで購入
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 統計 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                        <div class="glass-morphism p-4 rounded-lg text-center">
+                            <div class="text-2xl font-bold text-blue-300 mb-1">1000+</div>
+                            <div class="text-sm text-gray-300">商品数</div>
+                        </div>
+                        <div class="glass-morphism p-4 rounded-lg text-center">
+                            <div class="text-2xl font-bold text-blue-300 mb-1">500+</div>
+                            <div class="text-sm text-gray-300">顧客</div>
+                        </div>
+                        <div class="glass-morphism p-4 rounded-lg text-center">
+                            <div class="text-2xl font-bold text-blue-300 mb-1">24/7</div>
+                            <div class="text-sm text-gray-300">サポート</div>
+                        </div>
+                        <div class="glass-morphism p-4 rounded-lg text-center">
+                            <div class="text-2xl font-bold text-blue-300 mb-1">100%</div>
+                            <div class="text-sm text-gray-300">満足度</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- サイドバー -->
+                <div class="md:col-span-1">
+                    <div class="sidebar rounded-xl p-6 space-y-6">
+                        <!-- ギフトカード確認 -->
+                        <div class="glass-morphism p-4 rounded-lg">
+                            <div class="flex items-center space-x-3 mb-3">
+                                <i class="fas fa-gift text-blue-400 text-xl"></i>
+                                <h3 class="font-semibold">Check Giftcard</h3>
+                            </div>
+                            <input type="text" placeholder="Card Number" class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 mb-3">
+                            <button class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">Check</button>
+                        </div>
+                        
+                        <!-- VIP情報 -->
+                        <div class="glass-morphism p-4 rounded-lg">
+                            <div class="flex items-center space-x-3 mb-3">
+                                <i class="fas fa-crown text-yellow-400 text-xl"></i>
+                                <h3 class="font-semibold">Free VIP</h3>
+                            </div>
+                            <p class="text-sm text-gray-300 mb-3">Gain access to exclusive VIP perks, including special features and more.</p>
+                            <button class="w-full bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 transition">Learn More</button>
+                        </div>
+                        
+                        <!-- サポート -->
+                        <div class="glass-morphism p-4 rounded-lg">
+                            <div class="flex items-center space-x-3 mb-3">
+                                <i class="fas fa-info-circle text-green-400 text-xl"></i>
+                                <h3 class="font-semibold">Need Support?</h3>
+                            </div>
+                            <p class="text-sm text-gray-300 mb-3">Having difficulties purchasing a product? Contact us on Discord.</p>
+                            <button onclick="window.open('https://discord.gg/your-server', '_blank')" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2">
+                                <i class="fab fa-discord"></i>
+                                <span>Contact Us</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- カテゴリー -->
+    <section id="categories" class="py-16">
+        <div class="container mx-auto px-6">
+            <h2 class="text-3xl font-bold text-center mb-12">カテゴリー</h2>
+            <div class="flex flex-wrap justify-center gap-4">
+                <button onclick="filterProducts('all')" class="category-pill bg-purple-600 text-white px-6 py-2 rounded-full">
+                    すべて
+                </button>
+                <button onclick="filterProducts('software')" class="category-pill bg-gray-200 text-gray-700 px-6 py-2 rounded-full hover:bg-purple-600 hover:text-white">
+                    ソフトウェア
+                </button>
+                <button onclick="filterProducts('games')" class="category-pill bg-gray-200 text-gray-700 px-6 py-2 rounded-full hover:bg-purple-600 hover:text-white">
+                    ゲーム
+                </button>
+                <button onclick="filterProducts('templates')" class="category-pill bg-gray-200 text-gray-700 px-6 py-2 rounded-full hover:bg-purple-600 hover:text-white">
+                    テンプレート
+                </button>
+                <button onclick="filterProducts('courses')" class="category-pill bg-gray-200 text-gray-700 px-6 py-2 rounded-full hover:bg-purple-600 hover:text-white">
+                    コース
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 商品グリッド -->
+    <section id="products" class="py-16">
+        <div class="container mx-auto px-6">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold text-white">人気商品</h2>
+                <div class="text-white/70">
+                    <span id="loading-categories" class="loading-shimmer px-4 py-2 rounded-lg">Loading categories...</span>
+                </div>
+            </div>
+            
+            <div class="product-grid">
+                <!-- 商品カード -->
+                <div class="product-card card-hover glass-morphism rounded-xl overflow-hidden" data-category="software">
+                    <div class="h-48 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                        <i class="fas fa-code text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Premium Software Suite</h3>
+                        <p class="text-gray-300 mb-4">プロフェッショナル向けの高機能ソフトウェアパッケージ</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-2xl font-bold text-blue-300">¥9,800</span>
+                            <div class="flex items-center text-yellow-400">
+                                <i class="fas fa-star"></i>
+                                <span class="ml-1 text-gray-300">4.8</span>
+                            </div>
+                        </div>
+                        <button onclick="addToCart('Premium Software Suite', 9800)" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                            カートに追加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="product-card card-hover glass-morphism rounded-xl overflow-hidden" data-category="games">
+                    <div class="h-48 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+                        <i class="fas fa-gamepad text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Ultimate Game Pack</h3>
+                        <p class="text-gray-300 mb-4">最新のゲームコレクション、全50タイトル</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-2xl font-bold text-blue-300">¥4,800</span>
+                            <div class="flex items-center text-yellow-400">
+                                <i class="fas fa-star"></i>
+                                <span class="ml-1 text-gray-300">4.9</span>
+                            </div>
+                        </div>
+                        <button onclick="addToCart('Ultimate Game Pack', 4800)" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                            カートに追加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="product-card card-hover glass-morphism rounded-xl overflow-hidden" data-category="templates">
+                    <div class="h-48 bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
+                        <i class="fas fa-palette text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Design Template Pro</h3>
+                        <p class="text-gray-300 mb-4">プロ仕様のデザインテンプレート集</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-2xl font-bold text-blue-300">¥2,800</span>
+                            <div class="flex items-center text-yellow-400">
+                                <i class="fas fa-star"></i>
+                                <span class="ml-1 text-gray-300">4.7</span>
+                            </div>
+                        </div>
+                        <button onclick="addToCart('Design Template Pro', 2800)" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                            カートに追加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="product-card card-hover glass-morphism rounded-xl overflow-hidden" data-category="courses">
+                    <div class="h-48 bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center">
+                        <i class="fas fa-graduation-cap text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Master Course Bundle</h3>
+                        <p class="text-gray-300 mb-4">完全な学習コースパッケージ</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-2xl font-bold text-blue-300">¥12,800</span>
+                            <div class="flex items-center text-yellow-400">
+                                <i class="fas fa-star"></i>
+                                <span class="ml-1 text-gray-300">5.0</span>
+                            </div>
+                        </div>
+                        <button onclick="addToCart('Master Course Bundle', 12800)" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                            カートに追加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="product-card card-hover glass-morphism rounded-xl overflow-hidden" data-category="software">
+                    <div class="h-48 bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                        <i class="fas fa-tools text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Developer Tools Pro</h3>
+                        <p class="text-gray-300 mb-4">開発者向け必須ツールセット</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-2xl font-bold text-blue-300">¥6,800</span>
+                            <div class="flex items-center text-yellow-400">
+                                <i class="fas fa-star"></i>
+                                <span class="ml-1 text-gray-300">4.6</span>
+                            </div>
+                        </div>
+                        <button onclick="addToCart('Developer Tools Pro', 6800)" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                            カートに追加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="product-card card-hover glass-morphism rounded-xl overflow-hidden" data-category="templates">
+                    <div class="h-48 bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center">
+                        <i class="fas fa-file-code text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold mb-2 text-white">Code Templates Elite</h3>
+                        <p class="text-gray-300 mb-4">高品質なコードテンプレート集</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-2xl font-bold text-blue-300">¥3,800</span>
+                            <div class="flex items-center text-yellow-400">
+                                <i class="fas fa-star"></i>
+                                <span class="ml-1 text-gray-300">4.8</span>
+                            </div>
+                        </div>
+                        <button onclick="addToCart('Code Templates Elite', 3800)" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                            カートに追加
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 特徴 -->
+    <section class="py-16 bg-white">
+        <div class="container mx-auto px-6">
+            <h2 class="text-3xl font-bold text-center mb-12">なぜPRIM Storeを選ぶのか</h2>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-shield-alt text-purple-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">安全な取引</h3>
+                    <p class="text-gray-600">最新の暗号化技術で、あなたの取引を完全に保護</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-bolt text-purple-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">即時ダウンロード</h3>
+                    <p class="text-gray-600">購入後すぐにデジタルコンテンツにアクセス可能</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-headset text-purple-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">24/7サポート</h3>
+                    <p class="text-gray-600">いつでも専門家があなたの質問に対応</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 購入方法 -->
+    <section id="about" class="py-16 bg-gray-100">
+        <div class="container mx-auto px-6">
+            <h2 class="text-3xl font-bold text-center mb-12">購入方法</h2>
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 font-bold">
+                        1
+                    </div>
+                    <h3 class="font-semibold mb-2">商品を選択</h3>
+                    <p class="text-gray-600 text-sm">気に入った商品をカートに追加</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 font-bold">
+                        2
+                    </div>
+                    <h3 class="font-semibold mb-2">Discordで購入</h3>
+                    <p class="text-gray-600 text-sm">DiscordサーバーでPayPayギフトを送信</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 font-bold">
+                        3
+                    </div>
+                    <h3 class="font-semibold mb-2">確認</h3>
+                    <p class="text-gray-600 text-sm">管理者が支払いを確認</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 font-bold">
+                        4
+                    </div>
+                    <h3 class="font-semibold mb-2">ダウンロード</h3>
+                    <p class="text-gray-600 text-sm">DMでダウンロードリンクを受信</p>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                <a href="https://discord.gg/your-server" target="_blank" class="bg-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-purple-700 transition inline-flex items-center space-x-2">
+                    <i class="fab fa-discord"></i>
+                    <span>Discordサーバーに参加</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- フッター -->
+    <footer class="glass-morphism text-white py-12 border-t border-white/10">
+        <div class="container mx-auto px-6">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-sm">P</span>
+                        </div>
+                        <span class="font-bold">PRIM Store</span>
+                    </div>
+                    <p class="text-gray-300">高品質なデジタルコンテンツを、簡単・安全・迅速に</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">リンク</h4>
+                    <ul class="space-y-2 text-gray-300">
+                        <li><a href="#home" class="hover:text-white transition">ホーム</a></li>
+                        <li><a href="#products" class="hover:text-white transition">商品</a></li>
+                        <li><a href="#categories" class="hover:text-white transition">カテゴリー</a></li>
+                        <li><a href="#about" class="hover:text-white transition">について</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">サポート</h4>
+                    <ul class="space-y-2 text-gray-300">
+                        <li><a href="#" class="hover:text-white transition">よくある質問</a></li>
+                        <li><a href="#" class="hover:text-white transition">お問い合わせ</a></li>
+                        <li><a href="#" class="hover:text-white transition">利用規約</a></li>
+                        <li><a href="#" class="hover:text-white transition">プライバシー</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">フォロー</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-300 hover:text-white transition">
+                            <i class="fab fa-twitter text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-300 hover:text-white transition">
+                            <i class="fab fa-discord text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-300 hover:text-white transition">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-white/10 mt-8 pt-8 text-center text-gray-300">
+                <p>&copy; 2024 PRIM Store. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- カートモーダル -->
+    <div id="cart-modal" class="modal">
+        <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold">ショッピングカート</h3>
+                <button onclick="closeCart()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="cart-items" class="space-y-4 mb-6">
+                <!-- カートアイテムがここに表示される -->
+            </div>
+            <div class="border-t pt-4">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="font-semibold">合計:</span>
+                    <span id="cart-total" class="text-2xl font-bold text-purple-600">¥0</span>
+                </div>
+                <button onclick="checkout()" class="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition">
+                    Discordで購入
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 認証チェック
+        function checkAuthentication() {
+            const userInfo = localStorage.getItem('user_info');
+            if (!userInfo) {
+                // 未認証の場合、認証ページにリダイレクト
+                window.location.href = 'auth.html';
+                return false;
+            }
+            
+            const user = JSON.parse(userInfo);
+            if (!user.authenticated) {
+                window.location.href = 'auth.html';
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // 認証状態表示
+        function displayUserInfo() {
+            const userInfo = localStorage.getItem('user_info');
+            if (userInfo) {
+                const user = JSON.parse(userInfo);
+                // ユーザー情報をヘッダーに表示
+                const header = document.querySelector('nav .flex.items-center.justify-between');
+                if (header && user.user_name) {
+                    const userDisplay = document.createElement('div');
+                    userDisplay.className = 'hidden md:flex items-center space-x-2 text-white';
+                    userDisplay.innerHTML = `
+                        <i class="fas fa-user-circle"></i>
+                        <span>${user.user_name}</span>
+                    `;
+                    header.appendChild(userDisplay);
+                }
+            }
+        }
+
+        // カート管理
+        let cart = [];
+        
+        function addToCart(productName, price) {
+            cart.push({ name: productName, price: price });
+            updateCartUI();
+            showNotification(`${productName}がカートに追加されました`);
+        }
+        
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateCartUI();
+        }
+        
+        function updateCartUI() {
+            const cartCount = document.getElementById('cart-count');
+            const cartItems = document.getElementById('cart-items');
+            const cartTotal = document.getElementById('cart-total');
+            
+            cartCount.textContent = cart.length;
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p class="text-gray-500 text-center">カートは空です</p>';
+                cartTotal.textContent = '¥0';
+            } else {
+                cartItems.innerHTML = cart.map((item, index) => `
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <div class="font-semibold">${item.name}</div>
+                            <div class="text-purple-600">¥${item.price.toLocaleString()}</div>
+                        </div>
+                        <button onclick="removeFromCart(${index})" class="text-red-500 hover:text-red-700">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+                
+                const total = cart.reduce((sum, item) => sum + item.price, 0);
+                cartTotal.textContent = `¥${total.toLocaleString()}`;
+            }
+        }
+        
+        function openCart() {
+            document.getElementById('cart-modal').classList.add('active');
+        }
+        
+        function closeCart() {
+            document.getElementById('cart-modal').classList.remove('active');
+        }
+        
+        function checkout() {
+            if (cart.length === 0) {
+                showNotification('カートが空です');
+                return;
+            }
+            
+            const items = cart.map(item => `${item.name} (¥${item.price.toLocaleString()})`).join('\n');
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
+            
+            showNotification(`Discordサーバーで購入してください！\n\n商品:\n${items}\n\n合計: ¥${total.toLocaleString()}`);
+            
+            // Discordリンクを開く
+            window.open('https://discord.gg/your-server', '_blank');
+        }
+        
+        // 通知機能
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notification-text');
+            
+            notificationText.textContent = message;
+            notification.classList.remove('hidden');
+            
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 3000);
+        }
+        
+        // カテゴリーフィルター
+        function filterProducts(category) {
+            const products = document.querySelectorAll('.product-card');
+            const buttons = document.querySelectorAll('.category-pill');
+            
+            // ボタンのスタイルを更新
+            buttons.forEach(button => {
+                if (button.textContent.toLowerCase().includes(category) || (category === 'all' && button.textContent.includes('すべて'))) {
+                    button.className = 'category-pill bg-purple-600 text-white px-6 py-2 rounded-full';
+                } else {
+                    button.className = 'category-pill bg-gray-200 text-gray-700 px-6 py-2 rounded-full hover:bg-purple-600 hover:text-white';
+                }
+            });
+            
+            // 商品をフィルター
+            products.forEach(product => {
+                if (category === 'all' || product.dataset.category === category) {
+                    product.style.display = 'block';
+                } else {
+                    product.style.display = 'none';
+                }
+            });
+        }
+        
+        // スムーズスクロール
+        function scrollToProducts() {
+            document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // イベントリスナー
+        document.addEventListener('DOMContentLoaded', function() {
+            // 認証チェック
+            if (!checkAuthentication()) {
+                return;
+            }
+            
+            // ユーザー情報表示
+            displayUserInfo();
+            
+            // カートアイコンクリック
+            document.querySelector('.fa-shopping-cart').parentElement.addEventListener('click', openCart);
+            
+            // スムーズスクロール for ナビゲーションリンク
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            });
+            
+            // モーダル外クリックで閉じる
+            document.getElementById('cart-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeCart();
+                }
+            });
+            
+            // 初期化
+            updateCartUI();
+        });
+    </script>
+</body>
+</html>
