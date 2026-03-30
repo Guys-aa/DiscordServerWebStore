@@ -1,0 +1,6 @@
+name = "prim-store"
+compatibility_date = "2024-01-01"
+
+[vars]
+API_BASE_URL = "https://prim.gg"
+CLOUDFLARE_PAGES_URL = "https://prim.gg"
